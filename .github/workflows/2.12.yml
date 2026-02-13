@@ -1,0 +1,50 @@
+name: Build OpenClaw 2026.2.12 (VPS Optimized)
+
+on:
+  workflow_dispatch: # 允许你在 Actions 页面手动点击运行
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    # 这里的资源由 GitHub 提供，不花你的钱，也不占你 VPS 资源
+    runs-on: ubuntu-latest 
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout OpenClaw v2026.2.12
+        uses: actions/checkout@v4
+        with:
+          # 关键：锁定构建官方 2026.2.12 版本
+          repository: openclaw/openclaw
+          ref: v2026.2.12 
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push (AMD64 Only)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          # 针对你的 VPS 只有 1G 内存，只构建 amd64 架构
+          platforms: linux/amd64 
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:2026.2.12
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          # 核心优化：剥离调试符号 (-s -w)，让二进制文件体积减小，减少 VPS 运行时的内存换页
+          build-args: |
+            GOFLAGS=-ldflags="-s -w"
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
