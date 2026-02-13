@@ -1,0 +1,48 @@
+name: Build OpenClaw 2026.2.12 (Fixed Push)
+
+on:
+  workflow_dispatch: # 允许手动点击运行
+
+env:
+  REGISTRY: ghcr.io
+  # 明确指定包名，确保推送到您看到的那个 openclaw 包下
+  IMAGE_NAME: hy3188/openclaw 
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # 必须确保有写权限
+
+    steps:
+      - name: Checkout OpenClaw v2026.2.12
+        uses: actions/checkout@v4
+        with:
+          repository: openclaw/openclaw
+          ref: v2026.2.12 
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push (AMD64 Only)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          # 显式指定 Tag，避免使用 metadata-action 可能导致的路径错乱
+          tags: |
+            ghcr.io/hy3188/openclaw:2026.2.12
+            ghcr.io/hy3188/openclaw:latest
+          build-args: |
+            GOFLAGS=-ldflags="-s -w"
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
